@@ -2,8 +2,8 @@
 ## street of rage
 
 Tutte le modifiche rilevanti al progetto sono documentate in questo file.  
-Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).  
-Il progetto usa [Semantic Versioning](https://semver.org/lang/it/).
+Il formato segue 
+Il progetto usa 
 
 ---
 
@@ -15,7 +15,7 @@ Il progetto usa [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
-## [0.1.0] – 2025 – *Setup iniziale*
+## [0.1.0] – 2026 – *Setup iniziale*
 
 ### Added
 - Struttura cartelle progetto
@@ -27,8 +27,6 @@ Il progetto usa [Semantic Versioning](https://semver.org/lang/it/).
 - `TEST_CHECKLIST.md` – checklist test manuali
 - Template issue GitHub (bug report, feature request)
 - Template pull request GitHub
-- Linee guida uso AI (`AI_GUIDELINES.md`)
-
 ---
 
 <!-- Template per le versioni future:
