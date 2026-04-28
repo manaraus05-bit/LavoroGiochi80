@@ -1,0 +1,435 @@
+import React, { useMemo, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { CheckCircle2, Circle, Filter, FolderKanban, Gamepad2, GitBranch, Palette, FileText, Rocket } from "lucide-react";
+import { motion } from "framer-motion";
+
+const roles = [
+  {
+    persona: "Zeus",
+    ruolo: "Programmatore JS / HTML5 / CSS3",
+    icon: Gamepad2,
+    deliverable: "Prototipo giocabile",
+    responsabilita: [
+      "Gameplay core",
+      "Canvas HTML5",
+      "Input e movimento",
+      "Collisioni e attacchi",
+      "UI in-game"
+    ],
+    tasks: [
+      "Creare canvas HTML5",
+      "Implementare game loop",
+      "Gestire input tastiera",
+      "Implementare movimento player",
+      "Implementare attacco base",
+      "Implementare collisioni",
+      "Creare nemico base",
+      "Aggiungere HUD minima",
+      "Creare schermata start / game over"
+    ],
+    priority: "Altissima"
+  },
+  {
+    persona: "Alessandro",
+    ruolo: "Documentazione tecnica / Markdown / AI",
+    icon: FileText,
+    deliverable: "Documentazione ordinata",
+    responsabilita: [
+      "README e documenti tecnici",
+      "Linee guida AI",
+      "Checklist e changelog",
+      "Naming convention"
+    ],
+    tasks: [
+      "Scrivere README",
+      "Creare GAME_DESIGN_DOCUMENT",
+      "Creare TECH_SPEC",
+      "Aggiornare CHANGELOG",
+      "Definire naming convention",
+      "Creare checklist test",
+      "Preparare template issue e PR"
+    ],
+    priority: "Alta"
+  },
+  {
+    persona: "Valentino",
+    ruolo: "Asset grafici",
+    icon: Palette,
+    deliverable: "Pacchetto asset coerente",
+    responsabilita: [
+      "Sprite e animazioni",
+      "HUD e sfondi",
+      "Effetti visivi",
+      "Placeholder rapidi"
+    ],
+    tasks: [
+      "Definire stile visivo",
+      "Creare placeholder player e nemico",
+      "Preparare sprite e animazioni base",
+      "Disegnare HUD",
+      "Creare sfondo livello 1",
+      "Esportare asset ottimizzati"
+    ],
+    priority: "Alta"
+  },
+  {
+    persona: "Andrea",
+    ruolo: "GitHub / VS Code / Workflow",
+    icon: GitBranch,
+    deliverable: "Workflow stabile e pulito",
+    responsabilita: [
+      "Repo e branch strategy",
+      "Kanban board",
+      "Issue, label e milestone",
+      "Supporto merge e review"
+    ],
+    tasks: [
+      "Creare repository GitHub",
+      "Configurare .gitignore",
+      "Definire branch main/dev/feature",
+      "Creare board Kanban",
+      "Definire labels e milestone",
+      "Supportare PR e merge"
+    ],
+    priority: "Altissima"
+  }
+];
+
+const roadmap = [
+  {
+    phase: "Fase 1 – Pre-produzione",
+    objective: "Definire base del progetto",
+    output: "Setup iniziale pronto",
+    items: ["Concept", "MVP", "Setup repo", "Documentazione iniziale", "Placeholder grafici"]
+  },
+  {
+    phase: "Fase 2 – Prototipo tecnico",
+    objective: "Far funzionare il gameplay base",
+    output: "Prima build giocabile",
+    items: ["Movimento", "Collisioni", "Attacco", "Nemico base", "HP"]
+  },
+  {
+    phase: "Fase 3 – Vertical Slice",
+    objective: "Creare mini demo rappresentativa",
+    output: "Demo corta ma completa",
+    items: ["Livello breve", "HUD", "Start screen", "Game over", "Audio placeholder"]
+  },
+  {
+    phase: "Fase 4 – Polish",
+    objective: "Rifinire il progetto",
+    output: "Alpha / prototype presentabile",
+    items: ["Refactor", "Asset finali", "Bug fixing", "Performance", "Documentazione finale"]
+  }
+];
+
+const mvp = [
+  "1 player giocabile",
+  "Movimento X/Y",
+  "Attacco base",
+  "1 nemico base",
+  "Collisioni",
+  "HP / Barra vita",
+  "1 livello breve",
+  "Start screen",
+  "Game over",
+  "Documentazione base"
+];
+
+const priorities = [
+  [1, "Setup repo e struttura progetto", "Senza ordine si blocca tutto"],
+  [2, "Canvas + game loop", "È la base tecnica del gioco"],
+  [3, "Input + movimento player", "Prima bisogna poter giocare"],
+  [4, "Attacco base", "Fondamentale per il gameplay"],
+  [5, "Collisioni", "Serve a rendere il combattimento reale"],
+  [6, "Nemico base", "Completa il primo loop di gioco"],
+  [7, "HP / HUD", "Aggiunge stato e feedback"],
+  [8, "Livello breve", "Trasforma il prototipo in demo"],
+  [9, "Menu start / game over", "Completa l’esperienza"],
+  [10, "Polish + documentazione finale", "Da fare quando il core funziona"]
+];
+
+const boardData = {
+  Backlog: [
+    { title: "Combo avanzate", owner: "Programmatore", tag: "Extra" },
+    { title: "Boss fight", owner: "Programmatore", tag: "Extra" },
+    { title: "Audio completo", owner: "Asset / Workflow", tag: "Extra" }
+  ],
+  "To Do": [
+    { title: "Setup repository", owner: "GitHub / Workflow", tag: "Setup" },
+    { title: "README iniziale", owner: "Documentazione", tag: "Docs" },
+    { title: "Canvas HTML5", owner: "Programmatore", tag: "Core" },
+    { title: "Placeholder player e nemico", owner: "Asset grafici", tag: "Art" }
+  ],
+  "In Progress": [
+    { title: "Input tastiera", owner: "Programmatore", tag: "Core" },
+    { title: "Branch strategy", owner: "GitHub / Workflow", tag: "Setup" }
+  ],
+  Review: [
+    { title: "Struttura cartelle", owner: "Team", tag: "Review" }
+  ],
+  Done: [
+    { title: "Definizione MVP", owner: "Team", tag: "Planning" }
+  ]
+};
+
+const dod = [
+  "Funziona nel gioco",
+  "È stato testato",
+  "È stato pushato sul branch corretto",
+  "Ha commit/PR tracciata",
+  "Rispetta naming convention",
+  "Non rompe altre parti del progetto",
+  "È documentato se serve"
+];
+
+const allCards = Object.entries(boardData).flatMap(([column, items]) => items.map(item => ({ ...item, column })));
+
+export default function ProjectBoardBeatEmUp() {
+  const [query, setQuery] = useState("");
+  const [ownerFilter, setOwnerFilter] = useState("Tutti");
+
+  const owners = useMemo(() => ["Tutti", ...new Set(allCards.map(c => c.owner))], []);
+
+  const filteredBoard = useMemo(() => {
+    const match = (card) => {
+      const q = query.toLowerCase();
+      const okQuery = !q || card.title.toLowerCase().includes(q) || card.owner.toLowerCase().includes(q) || card.tag.toLowerCase().includes(q);
+      const okOwner = ownerFilter === "Tutti" || card.owner === ownerFilter;
+      return okQuery && okOwner;
+    };
+
+    return Object.fromEntries(
+      Object.entries(boardData).map(([column, cards]) => [column, cards.filter(match)])
+    );
+  }, [query, ownerFilter]);
+
+  const doneCount = boardData.Done.length;
+  const totalCount = allCards.length;
+  const progress = Math.round((doneCount / totalCount) * 100);
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-6 text-slate-900">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="grid gap-4 md:grid-cols-[1.5fr_1fr]">
+          <Card className="rounded-2xl shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-2xl">
+                <FolderKanban className="h-6 w-6" />
+                Project Board – Beat ’Em Up 2D
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-slate-600">
+                Dashboard operativo per visualizzare ruoli, roadmap, MVP, priorità e stato del board del progetto.
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span>Avanzamento attuale</span>
+                  <span className="font-medium">{progress}%</span>
+                </div>
+                <Progress value={progress} />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">MVP first</Badge>
+                <Badge variant="secondary">4 persone</Badge>
+                <Badge variant="secondary">HTML5 • CSS3 • JavaScript</Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Rocket className="h-5 w-5" />
+                Focus del PM
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2 text-sm text-slate-700">
+                <li>• Completare prima il core loop: movimento → attacco → collisioni → nemico.</li>
+                <li>• Usare placeholder grafici prima degli asset finali.</li>
+                <li>• Lavorare su branch dedicati, non direttamente su <code>main</code>.</li>
+                <li>• Considerare extra solo dopo il completamento dell’MVP.</li>
+              </ul>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <Tabs defaultValue="team" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-5 rounded-2xl">
+            <TabsTrigger value="team">Team</TabsTrigger>
+            <TabsTrigger value="roadmap">Roadmap</TabsTrigger>
+            <TabsTrigger value="mvp">MVP</TabsTrigger>
+            <TabsTrigger value="priorita">Priorità</TabsTrigger>
+            <TabsTrigger value="board">Board</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="team" className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-2">
+              {roles.map((role, idx) => {
+                const Icon = role.icon;
+                return (
+                  <motion.div key={role.persona} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
+                    <Card className="rounded-2xl shadow-sm h-full">
+                      <CardHeader>
+                        <CardTitle className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="rounded-2xl bg-slate-100 p-2"><Icon className="h-5 w-5" /></div>
+                            <div>
+                              <div className="text-base font-semibold">{role.ruolo}</div>
+                              <div className="text-sm text-slate-500">{role.persona}</div>
+                            </div>
+                          </div>
+                          <Badge>{role.priority}</Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div>
+                          <p className="mb-2 text-sm font-medium">Responsabilità</p>
+                          <div className="flex flex-wrap gap-2">
+                            {role.responsabilita.map(item => <Badge key={item} variant="secondary">{item}</Badge>)}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="mb-2 text-sm font-medium">To-do principali</p>
+                          <ul className="space-y-1 text-sm text-slate-700">
+                            {role.tasks.map(task => <li key={task}>• {task}</li>)}
+                          </ul>
+                        </div>
+                        <div className="rounded-xl bg-slate-50 p-3 text-sm"><span className="font-medium">Deliverable:</span> {role.deliverable}</div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="roadmap" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {roadmap.map((phase, idx) => (
+                <motion.div key={phase.phase} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
+                  <Card className="rounded-2xl shadow-sm h-full">
+                    <CardHeader>
+                      <CardTitle className="text-base">{phase.phase}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                      <div><span className="font-medium">Obiettivo:</span> {phase.objective}</div>
+                      <div>
+                        <span className="font-medium">Task inclusi:</span>
+                        <ul className="mt-2 space-y-1 text-slate-700">
+                          {phase.items.map(item => <li key={item}>• {item}</li>)}
+                        </ul>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-3"><span className="font-medium">Output:</span> {phase.output}</div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="mvp" className="space-y-4">
+            <Card className="rounded-2xl shadow-sm">
+              <CardHeader>
+                <CardTitle>MVP – Cosa completare per primi</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-2">
+                {mvp.map((item, idx) => (
+                  <div key={item} className="flex items-center gap-3 rounded-xl border bg-white p-3">
+                    {idx < 3 ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <Circle className="h-5 w-5 text-slate-400" />}
+                    <span className="text-sm">{item}</span>
+                    <Badge className="ml-auto" variant="secondary">Essenziale</Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="priorita" className="space-y-4">
+            <div className="grid gap-3">
+              {priorities.map(([order, task, why]) => (
+                <Card key={order} className="rounded-2xl shadow-sm">
+                  <CardContent className="flex items-start gap-4 p-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-white text-sm font-bold">{order}</div>
+                    <div className="space-y-1">
+                      <div className="font-medium">{task}</div>
+                      <div className="text-sm text-slate-600">{why}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <Card className="rounded-2xl shadow-sm">
+              <CardHeader>
+                <CardTitle>Definition of Done</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-2 md:grid-cols-2">
+                {dod.map(item => (
+                  <div key={item} className="flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    {item}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="board" className="space-y-4">
+            <Card className="rounded-2xl shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Filter className="h-5 w-5" />
+                  Filtro del board
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-[1.2fr_1fr]">
+                <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cerca task, owner o tag..." />
+                <div className="flex flex-wrap gap-2">
+                  {owners.map(owner => (
+                    <Button key={owner} variant={ownerFilter === owner ? "default" : "outline"} onClick={() => setOwnerFilter(owner)} className="rounded-2xl">
+                      {owner}
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid gap-4 xl:grid-cols-5">
+              {Object.entries(filteredBoard).map(([column, cards]) => (
+                <Card key={column} className="rounded-2xl shadow-sm min-h-[420px]">
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between text-base">
+                      <span>{column}</span>
+                      <Badge variant="secondary">{cards.length}</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {cards.length === 0 ? (
+                      <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Nessun task con i filtri attuali.</div>
+                    ) : cards.map(card => (
+                      <motion.div key={`${column}-${card.title}`} whileHover={{ y: -2 }}>
+                        <div className="rounded-2xl border bg-white p-3 shadow-sm">
+                          <div className="mb-2 font-medium text-sm">{card.title}</div>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="secondary">{card.owner}</Badge>
+                            <Badge>{card.tag}</Badge>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
