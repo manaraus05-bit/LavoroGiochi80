@@ -1,5 +1,5 @@
 # DECISIONS
-## LavoroGiochi80 – Registro Decisioni Tecniche
+## street of rage – Registro Decisioni Tecniche
 
 Questo documento traccia le decisioni tecniche e di design prese dal team, con motivazione e alternative valutate.
 
