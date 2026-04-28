@@ -1,10 +1,11 @@
 # GAME DESIGN DOCUMENT
-## LavoroGiochi80 – Beat 'Em Up Arcade
+## street of rage – Beat 'Em Up Arcade
 
 **Versione documento:** 0.1  
-**Data:** 2025  
+**Data:** 2026
 **Stato:** Bozza / MVP
 
+### **FORMATO:** 16:9
 ---
 
 ## 1. Concept del gioco
@@ -30,41 +31,13 @@ Giocatori casual / nostalgici, studenti di sviluppo web
 
 ## 2. Personaggi
 
-### 2.1 Protagonista – **MARCO "FERRO" RICCI**
+---
 
-| Attributo | Valore MVP |
-|-----------|-----------|
-| Vita (HP) | 100 |
-| Velocità movimento | 3 px/frame |
-| Danno attacco base | 15 |
-| Animazioni | idle, walk, attack, hurt, death |
-
-**Descrizione:** Ex poliziotto in pensione anticipata, tornato a ripulire le strade del quartiere. Stile diretto, pugni forti, nessun fronzolo.
-
-**Moveset MVP:**
-- **Pugno diretto** – attacco base rapido, range corto
-
-**Moveset post-MVP:**
-- Calcio rotante
-- Combo 3 colpi
-- Attacco speciale (costa HP)
+### 2.1 Protagonista 
 
 ---
 
-### 2.2 Nemico base – **TEPPISTA**
-
-| Attributo | Valore MVP |
-|-----------|-----------|
-| Vita (HP) | 40 |
-| Velocità movimento | 1.5 px/frame |
-| Danno contatto | 10 |
-| Comportamento | avvicinarsi al player e attaccare |
-| Animazioni | idle, walk, attack, hurt, death |
-
-**AI base:**
-1. Se distanza dal player > soglia → muoviti verso player
-2. Se distanza dal player ≤ range attacco → attacca
-3. Se HP ≤ 0 → animazione morte → rimozione dalla scena
+### 2.2 Nemico base – 
 
 ---
 
@@ -165,11 +138,12 @@ START_SCREEN
 
 | Evento | Suono |
 |--------|-------|
-| Attacco | `sfx_punch.wav` |
-| Hit ricevuto | `sfx_hit.wav` |
-| Nemico morto | `sfx_enemy_death.wav` |
-| Game Over | `sfx_gameover.wav` |
-| Musica di gioco | `bgm_level1.mp3` (loop) |
+| Attacco | `attack` |
+| Hit ricevuto | `hit ricevuto` |
+| Nemico morto | `enemydeath` |
+| Game Over | `player death` |
+| Musica di gioco | `soundgame` (loop) |
+| mossa speciale | ``|
 
 > Tutti i file audio devono essere **royalty-free** o prodotti originalmente.
 
