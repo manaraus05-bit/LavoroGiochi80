@@ -1,5 +1,12 @@
 ﻿# LavoroGiochi80
-# LavoroGiochi80
+## Zeus : Ruolo Programmatore Principale 
+## Andre : WorkFlow
+## Ale : Supporto Programmtore + Documentazione
+## Vale : Asset Grafici
+### Tutti Supporter
+
+
+
 # Beat 'Em Up Project – Ispirato ai classici arcade anni '90
 
 > Progetto di un videogioco **beat 'em up 2D** sviluppato con **HTML5, CSS3 e JavaScript**, ispirato ai grandi classici del genere.  
