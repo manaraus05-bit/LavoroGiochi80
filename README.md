@@ -1,10 +1,11 @@
 ﻿# LavoroGiochi80
 ## Zeus : Ruolo Programmatore Principale 
-## Andre : WorkFlow
+## Andre : GitHub / VS Code / Workflow / Comunicazione
 ## Ale : Supporto Programmtore + Documentazione
 ## Vale : Asset Grafici
 ### Tutti Supporter
 
+## DeadLine = Max Tre Lezioni
 
 
 # Beat 'Em Up Project – Ispirato ai classici arcade anni '90
