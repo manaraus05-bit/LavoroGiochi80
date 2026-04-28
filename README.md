@@ -5,7 +5,7 @@
 ## Vale : Asset Grafici
 ### Tutti Supporter
 
-## DeadLine = Max Tre Lezioni
+## DeadLine = Max Tre Lezioni ( 16/06/2026 )
 
 
 # Beat 'Em Up Project – Ispirato ai classici arcade anni '90
