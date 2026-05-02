@@ -3,6 +3,7 @@
 
 Tutte le modifiche rilevanti al progetto sono documentate in questo file.  
 Il formato segue 
+
 Il progetto usa 
 
 ---
