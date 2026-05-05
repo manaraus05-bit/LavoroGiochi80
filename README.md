@@ -18,7 +18,7 @@
 Realizzare un **prototipo giocabile** di un picchiaduro a scorrimento laterale con le seguenti funzionalità minime:
 
 - 1 personaggio giocante
-- movimento su asse X + profondità su asse Y
+- movimento su asse X + profondità su asse Y, cordinate spawn + altezza min e max.
 - attacco base
 - 1 tipo di nemico
 - collisioni
