@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Streets of Rage – Beat 'Em Up</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: monospace; }
+  #gameCanvas { display: block; image-rendering: pixelated; border: 2px solid #333; }
+  #controls { color: #888; font-size: 12px; margin-top: 8px; text-align: center; }
+  #controls span { color: #ccc; }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="800" height="450"></canvas>
+<div id="controls">
+  <span>← →</span> Muovi &nbsp;|&nbsp; <span>↑ ↓</span> Profondità &nbsp;|&nbsp;
+  <span>SPAZIO</span> Salto &nbsp;|&nbsp;
+  <span>A</span> Attacco &nbsp;|&nbsp; <span>L</span> Speciale &nbsp;|&nbsp;
+  <span>Enter</span> Start
+</div>
+<script>
+
+  //LIVELLO 1
+
+//AGGIUNGERE QUI IL BASE64
+  
+//immagini (personaggi,sfondo)
+
+// musica 
+
+
+const CFG = {
+  canvas: { width: 3000, height: 3000 },
+  player: {
+    speed: 4,
+    hp: 100,
+    attackDamage: 15,
+    attackDuration: 20,
+    attackRange: 60,
+    hurtDuration: 15,
+    specialCost: 30,
+    specialDamage: 40,
+    comboWindow: 25,
+    jumpVy: -9,
+    gravity: 0.50,
+  },
+  enemy: {
+    speed: 1.5, hp: 30, damage: 10,
+    attackRange: 40, attackCooldown: 90, detectRange: 300,
+  },
+  boss: {
+    speed: 3.4, hp: 150, damage: 20,
+    attackRange: 50, attackCooldown: 60, detectRange: 800,
+  },
+  spawn: {
+    wave1: [{x:720,y:300},{x:650,y:300},{x:550,y:300}], 
+    wave2: [{x:650,y:300},{x:820,y:300},{x:790,y:300},{x:760,y:300}],
+    boss:  [{x:650,y:300}],
+  },
+  ground: { yMin: 400, yMax: 290 },
+};
+
+const SPRITES = {
+  idle:   { frames: 4, fw: 209, fh: 470, sheet: 'walk' }, 
+  walk:   { frames: 4, fw: 209, fh: 470, sheet: 'walk' },
+  attack: { frames: 3, fw: 278, fh: 470, sheet: 'attack' },
+  hurt:   { frames: 1, fw: 512, fh: 512, sheet: 'hurt' },
+  death:  { frames: 4, fw: 209, fh: 470, sheet: 'death' },
+  jump:   { frames: 4, fw: 209, fh: 470, sheet: 'walk' }, 
+};
+
+const ENEMY_SPRITES = {
+  idle:   { frames: 1, fw: 677, fh: 369, sheet: 'alienIdle' },
+  walk:   { frames: 1, fw: 677, fh: 369, sheet: 'alienWalk' },
+  attack: { frames: 1, fw: 661, fh: 377, sheet: 'alienAttack' },
+  hurt:   { frames: 1, fw: 661, fh: 377, sheet: 'alienAttack' }, 
+  death:  { frames: 1, fw: 677, fh: 369, sheet: 'alienDeath' },
+};
+
+const STATE = { START:'START', PLAYING:'PLAYING', GAMEOVER:'GAMEOVER', WIN:'WIN' };
+
+// ── INPUT ──────────────────────────────────────
+class InputHandler {
+  constructor() {
+    this.keys = {};
+    this.justPressed = {};
+    document.addEventListener('keydown', e => {
+      if (!this.keys[e.code]) this.justPressed[e.code] = true;
+      this.keys[e.code] = true;
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+    });
+    document.addEventListener('keyup', e => { this.keys[e.code] = false; });
+  }
+  is(code)       { return !!this.keys[code]; }
+  wasPressed(code) { const r = !!this.justPressed[code]; if (r) delete this.justPressed[code]; return r; }
+}
+
+// ── PARTICLE ───────────────────────────────────
+class Particle {
+  constructor(x, y, color) {
+    this.x = x; this.y = y;
+    this.vx = (Math.random()-0.5)*4;
+    this.vy = (Math.random()-1.2)*4;
+    this.color = color;
+    this.life = 30 + Math.random()*20|0;
+    this.size = 3 + Math.random()*3;
+  }
+  update() { this.x+=this.vx; this.y+=this.vy; this.vy+=0.15; this.life--; }
+  render(ctx) {
+    ctx.globalAlpha = this.life/50;
+    ctx.fillStyle = this.color;
+    ctx.fillRect(this.x-this.size/2, this.y-this.size/2, this.size, this.size);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ── PICKUP ─────────────────────────────────────
+class Pickup {
+  constructor(game, x, y) {
+    this.game=game; this.x=x; this.y=y;
+    this.collected=false;
+    this.type = Math.random()<0.6 ? 'food' : 'knife';
+    this.bob=0;
+  }
+  update(player) {
+    this.bob+=0.1;
+    const dx=player.x-this.x, dy=player.y-this.y;
+    if (Math.sqrt(dx*dx+dy*dy)<30 && player.state!=='dead') {
+      this.collected=true;
+      if (this.type==='food') {
+        player.hp=Math.min(CFG.player.hp, player.hp+25);
+        this.game.spawnParticle(this.x,this.y,'#00ff88',8);
+      } else {
+        player.special=Math.min(100,player.special+40);
+        this.game.spawnParticle(this.x,this.y,'#00aaff',8);
+      }
+    }
+  }
+  render(ctx) {
+    const yOff=Math.sin(this.bob)*3;
+    if (this.type==='food') {
+      if (this.game.imgs.heart) ctx.drawImage(this.game.imgs.heart,this.x-14,this.y-14+yOff,28,28);
+    } else {
+      ctx.strokeStyle='#aaddff'; ctx.lineWidth=2;
+      ctx.save(); ctx.translate(this.x,this.y+yOff); ctx.rotate(Math.PI/4);
+      ctx.beginPath(); ctx.moveTo(0,-12); ctx.lineTo(0,12);
+      ctx.moveTo(-4,-6); ctx.lineTo(0,-12); ctx.lineTo(4,-6);
+      ctx.stroke(); ctx.restore();
+    }
+  }
+}
+
+// ── PLAYER ─────────────────────────────────────
+class Player {
+  constructor(game) {
+    this.game=game;
+    this.x=140; this.y=220;
+    this.groundY=300;   
+    this.vy=0;         
+    this.jumping=false;
+    this.w=60; this.h=80;
+    this.hp=CFG.player.hp;
+    this.special=50;
+    this.state='idle';
+    this.facing='right';
+    this.frame=0; this.frameTick=0; this.frameSpeed=8;
+    this.actionTimer=0; this.hurtTimer=0; this.invincible=0;
+    this.comboCount=0; this.comboTimer=0;
+  }
+
+  get onGround() { return !this.jumping; }
+
+  update(dt) {
+    const inp=this.game.input;
+
+    if (this.state==='dead') { this.animateDeath(); return; }
+    if (this.invincible>0) this.invincible--;
+    if (this.comboTimer>0) { this.comboTimer--; if(!this.comboTimer) this.comboCount=0; }
+
+    if (this.state==='hurt') {
+      this.hurtTimer--;
+      if (this.hurtTimer<=0) this.state='idle';
+      this.applyJumpPhysics();
+      this.animateFrame(); return;
+    }
+    if (this.state==='attack') {
+      this.actionTimer--;
+      this.applyJumpPhysics();
+      this.animateFrame();
+      if (this.actionTimer<=0) { this.state='idle'; this.frame=0; }
+      return;
+    }
+
+    // ── Movimento orizzontale (solo ← →)
+    let moved=false;
+    if (inp.is('ArrowRight')) { this.x+=CFG.player.speed; this.facing='right'; moved=true; }
+    if (inp.is('ArrowLeft'))  { this.x-=CFG.player.speed; this.facing='left';  moved=true; }
+
+    // ── Profondità (↑↓) solo a terra
+    if (this.onGround) {
+      if (inp.is('ArrowDown'))  { this.groundY=Math.min(CFG.ground.yMax, this.groundY+CFG.player.speed*0.6); moved=true; }
+      if (inp.is('ArrowUp'))    { this.groundY=Math.max(CFG.ground.yMin, this.groundY-CFG.player.speed*0.6); moved=true; }
+    }
+
+    // ── Salto (spazio)
+    if (inp.wasPressed('Space') && this.onGround) {
+      this.vy=CFG.player.jumpVy;
+      this.jumping=true;
+    }
+
+    // ── Fisica salto
+    this.applyJumpPhysics();
+
+    // ── Clamp X
+    this.x=Math.max(20,Math.min(760,this.x));
+
+    // ── Attacco (A)
+    if (inp.wasPressed('KeyA')) {
+      this.state='attack';
+      this.actionTimer=CFG.player.attackDuration;
+      this.frame=0;
+      this.comboCount++;
+      this.comboTimer=CFG.player.comboWindow;
+      this.doAttack();
+    }
+
+    // ── Speciale (L)
+    if (inp.wasPressed('KeyL') && this.special>=CFG.player.specialCost) {
+      this.special-=CFG.player.specialCost;
+      this.doSpecial();
+    }
+
+    // Stato animazione
+    if (this.state!=='attack') {
+      if (this.jumping) this.state='jump';
+      else              this.state = moved ? 'walk' : 'idle';
+    }
+    this.animateFrame();
+
+    // Ricarica special
+    if (this.special<100 && this.game.frameCount%60===0) this.special=Math.min(100,this.special+5);
+  }
+
+  applyJumpPhysics() {
+    if (this.jumping) {
+      this.vy+=CFG.player.gravity;
+      this.y+=this.vy;
+      if (this.y>=this.groundY) {
+        this.y=this.groundY;
+        this.vy=0;
+        this.jumping=false;
+        if (this.state==='jump') this.state='idle';
+      }
+    } else {
+      this.y=this.groundY;
+    }
+  }
+
+  doAttack() {
+    this.game.enemies.forEach(e=>{
+      if (e.state==='dead') return;
+      const dx=Math.abs(e.x-this.x), dy=Math.abs(e.y-this.y);
+      const yTol = this.jumping ? 60 : 30;
+      const xOk = this.facing==='right' ? (e.x>this.x-10 && dx<CFG.player.attackRange)
+                                        : (e.x<this.x+10 && dx<CFG.player.attackRange);
+      if (xOk && dy<yTol) {
+        e.takeDamage(CFG.player.attackDamage);
+        this.game.score+=10;
+        this.game.spawnParticle(e.x,e.y-20,'#ff6600');
+        this.game.playSound('sndAttack', 0.7);
+      }
+    });
+  }
+
+  doSpecial() {
+    this.game.enemies.forEach(e=>{
+      if (e.state==='dead') return;
+      const dx=e.x-this.x, dy=e.y-this.y;
+      if (Math.sqrt(dx*dx+dy*dy)<150) {
+        e.takeDamage(CFG.player.specialDamage);
+        this.game.score+=30;
+        this.game.spawnParticle(e.x,e.y-20,'#00bfff',12);
+      }
+    });
+    this.game.spawnParticle(this.x,this.y,'#00bfff',20);
+  }
+
+  takeDamage(amount) {
+    if (this.invincible>0) return;
+    this.hp=Math.max(0,this.hp-amount);
+    this.state='hurt'; this.hurtTimer=CFG.player.hurtDuration;
+    this.invincible=40; this.frame=0;
+    this.game.playSound('sndHit', 0.8);
+    if (this.hp<=0) { this.state='dead'; this.frame=0; }
+  }
+
+  animateDeath() {
+    this.frameTick++;
+    if (this.frameTick>=12) {
+      this.frameTick=0;
+      if (this.frame<SPRITES.death.frames-1) this.frame++;
+      else setTimeout(()=>{ this.game.state=STATE.GAMEOVER; },1000);
+    if (this.frame === 0 && this.frameTick === 1) {
+    this.game.playSound('sndPlayerDeath');
+    this.game.stopMusic();
+}
+    }
+  }
+
+  animateFrame() {
+    this.frameTick++;
+    const sp=this.state==='attack'?6:this.frameSpeed;
+    if (this.frameTick>=sp) {
+      this.frameTick=0;
+      const spr=this.currentSprite();
+      this.frame=(this.frame+1)%spr.frames;
+    }
+  }
+
+  currentSprite() {
+    if (this.state==='dead')   return SPRITES.death;
+    if (this.state==='hurt')   return SPRITES.hurt;
+    if (this.state==='attack') return SPRITES.attack;
+    if (this.state==='jump')   return SPRITES.jump;
+    if (this.state==='walk')   return SPRITES.walk;
+    return SPRITES.idle;
+  }
+
+  render(ctx) {
+    const spr=this.currentSprite();
+    const img=this.game.imgs[spr.sheet];
+    if (!img) return;
+
+    const scale=0.34;
+    const dw=spr.fw*scale, dh=spr.fh*scale;
+    const sx=this.frame*spr.fw;
+
+    // Ombra a terra
+    ctx.fillStyle='rgba(0,0,0,0.25)';
+    ctx.beginPath();
+    ctx.ellipse(this.x, this.groundY+2, 18, 5, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.save();
+    if (this.invincible>0 && Math.floor(this.invincible/4)%2===0) ctx.globalAlpha=0.4;
+    if (this.facing==='left') {
+      ctx.translate(this.x,this.y);
+      ctx.scale(-1,1);
+      ctx.drawImage(img,sx,0,spr.fw,spr.fh,-dw/2,-dh,dw,dh);
+    } else {
+      ctx.drawImage(img,sx,0,spr.fw,spr.fh,this.x-dw/2,this.y-dh,dw,dh);
+    }
+    ctx.restore();
+  }
+}
+
+// ── ENEMY ──────────────────────────────────────
+class Enemy {
+  constructor(game,x,y,isBoss=false) {
+    this.game=game; this.x=x; this.y=y;
+    this.isBoss=isBoss;
+    const cfg=isBoss?CFG.boss:CFG.enemy;
+    this.hp=cfg.hp; this.maxHp=cfg.hp;
+    this.speed=cfg.speed; this.damage=cfg.damage;
+    this.attackRange=cfg.attackRange;
+    this.attackCooldown=0; this.attackCooldownMax=cfg.attackCooldown;
+    this.detectRange=cfg.detectRange;
+    this.w=50; this.h=70;
+    this.state='idle'; this.facing='left';
+    this.frame=0; this.frameTick=0; this.hurtTimer=0;
+    this.removed=false; this.deadTimer=0;
+    this.bossPhase=0;
+  }
+
+  update() {
+    if (this.state==='dead') { this.deadTimer++; if(this.deadTimer>90) this.removed=true; this.animateFrame(); return; }
+    if (this.state==='hurt') { this.hurtTimer--; if(this.hurtTimer<=0) this.state='idle'; this.animateFrame(); return; }
+    if (this.attackCooldown>0) this.attackCooldown--;
+
+    const p=this.game.player;
+    const dx = p.x - this.x;
+    const dy = p.groundY - this.y;
+    const dist = Math.hypot(dx, dy) || 0.0001;
+    this.facing = dx > 0 ? 'right' : 'left';
+
+    if (dist < this.detectRange) {
+    // SEMPRE inseguire in profondità (Y), indipendentemente dalla distanza X
+      if (Math.abs(dy) > 2) {
+        this.y += (dy / dist) * this.speed * 0.7;
+        this.y = Math.min(CFG.ground.yMin, Math.max(CFG.ground.yMax, this.y));
+
+    }
+
+    // Movimento orizzontale SOLO se lontano abbastanza
+    if (dist > this.attackRange + 5) {
+      this.x += (dx / dist) * this.speed;
+      this.state = 'walk';
+    } else {
+      this.state = 'idle';
+        if (this.attackCooldown <= 0 && p.state !== 'dead') {
+          this.attackCooldown = this.attackCooldownMax;
+          p.takeDamage(this.damage);
+        this.game.spawnParticle(p.x, p.y - 20, '#ff0000', 4);
+        if (this.isBoss) { 
+          this.bossPhase++; 
+          if (this.bossPhase % 3 === 0) { 
+            p.takeDamage(this.damage * 1.5); 
+            this.game.spawnParticle(p.x, p.y - 30, '#ff00ff', 10); 
+          } 
+        }
+      }
+    }
+  } else { 
+    this.state = 'idle'; 
+  }
+  this.animateFrame();
+}
+  takeDamage(amount) {
+    this.hp-=amount;
+    this.state='hurt'; this.hurtTimer=12; this.frame=0;
+    if (this.hp<=0) {
+      this.hp=0; this.state='dead'; this.frame=0;
+      this.game.score+=this.isBoss?200:50;
+      this.game.spawnParticle(this.x,this.y-30,'#ffcc00',15);
+      if (Math.random()<0.35&&!this.isBoss) this.game.pickups.push(new Pickup(this.game,this.x,this.y));
+    if (this.hp <= 0) {
+      this.game.playSound('sndEnemyDeath', 0.6);
+}
+    
+    }
+  }
+
+  animateFrame() {
+    this.frameTick++;
+    if (this.frameTick>=8) { this.frameTick=0; const s=this.currentSprite(); this.frame=(this.frame+1)%s.frames; }
+  }
+
+  // DOPO (usa ENEMY_SPRITES dell'alieno):
+  currentSprite() {
+    if (this.state==='dead') return ENEMY_SPRITES.death;
+    if (this.state==='hurt') return ENEMY_SPRITES.hurt;
+    if (this.state==='walk') return ENEMY_SPRITES.walk;
+    if (this.state==='attack') return ENEMY_SPRITES.attack;
+    return ENEMY_SPRITES.idle;
+}
+
+  render(ctx) {
+    const spr=this.currentSprite();
+    const img=this.game.imgs[spr.sheet];
+    if (!img) return;
+    const scale=0.34;
+    const dw=spr.fw*scale, dh=spr.fh*scale;
+    const sx = 0;
+    const sw = img.naturalWidth;   // larghezza reale dell'immagine
+    const sh = img.naturalHeight;  // altezza reale dell'immagine
+    console.log("Enemy sprite sheet:", spr.sheet, "img:", !!img); // ← aggiungi
+
+    // Ombra
+    ctx.fillStyle='rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    ctx.ellipse(this.x,this.y+2,this.isBoss?22:15,5,0,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.save();
+    if (this.isBoss) ctx.filter='hue-rotate(180deg) saturate(2)';
+    if (this.facing==='left') {
+      ctx.translate(this.x,this.y); ctx.scale(-1,1);
+      ctx.drawImage(img,sx,0,spr.fw,spr.fh,-dw/2,-dh,dw,dh);
+    } else {
+      ctx.drawImage(img,sx,0,spr.fw,spr.fh,this.x-dw/2,this.y-dh,dw,dh);
+    }
+    ctx.restore();
+
+    // Barra HP
+    if (this.state!=='dead') {
+      const bw=this.isBoss?60:40, bh=4;
+      const bx=this.x-bw/2, by=this.y-dh-6;
+      ctx.fillStyle='#333'; ctx.fillRect(bx,by,bw,bh);
+      ctx.fillStyle=this.isBoss?'#ff00aa':'#ff4444';
+      ctx.fillRect(bx,by,bw*(this.hp/this.maxHp),bh);
+    }
+  }
+}
+
+// ── GAME ───────────────────────────────────────
+class Game {
+  constructor(canvas,ctx) {
+    this.canvas=canvas; this.ctx=ctx;
+    this.imgs={}; this.state=STATE.START;
+    this.snds = {};
+    this.lastTime=0; this.frameCount=0; this.score=0;
+    this.wave=0; this.maxWaves=3;
+    this.player=null; this.enemies=[]; this.pickups=[]; this.particles=[];
+    this.input=new InputHandler();
+  }
+
+  loadAssets() {
+  const imgPromises = Object.entries(ASSETS_B64).map(([k,v]) => new Promise(res => {
+    const img = new Image();
+    img.onload  = () => { this.imgs[k] = img; res(); };
+    img.onerror = () => { console.warn(`⚠️ Asset non caricato: ${k}`); res(); };
+    img.src = v;
+  }));
+
+  const sndPromises = Object.entries(SOUNDS_B64).map(([k,v]) => new Promise(res => {
+    const audio = new Audio();
+    audio.oncanplaythrough = () => { this.snds[k] = audio; res(); };
+    audio.onerror = () => { console.warn(`⚠️ Suono non caricato: ${k}`); res(); };
+    audio.src = v;
+  }));
+
+  return Promise.all([...imgPromises, ...sndPromises]);  // ← return unico alla fine
+}
+
+  playSound(key, volume=4.0) {
+  const snd = this.snds[key];
+  if (!snd) { console.warn("Suono mancante:", key); return; }
+  const s = snd.cloneNode();
+  s.volume = volume;
+  const p = s.play();
+  if (p !== undefined) {
+    p.catch(e => console.warn("Autoplay bloccato:", key, e.message));
+  }
+}
+
+playMusic() {
+  const m = this.snds['sndMusic'];
+  if (!m) return;
+  m.loop = true;
+  m.volume = 0.4;
+  m.play().catch(()=>{});
+}
+
+stopMusic() {
+  const m = this.snds['sndMusic'];
+  if (m) { m.pause(); m.currentTime = 0; }
+}
+
+  start() {
+    this.state=STATE.PLAYING; this.score=0; this.wave=0;
+    this.player=new Player(this);
+    this.enemies=[]; this.pickups=[]; this.particles=[];
+    this.spawnWave();
+    this.playMusic();  
+}
+  spawnWave() {
+    this.wave++;
+    const isBoss=this.wave>=this.maxWaves;
+    const pos=isBoss?CFG.spawn.boss:this.wave===1?CFG.spawn.wave1:CFG.spawn.wave2;
+    this.enemies=pos.map(p=>new Enemy(this,p.x,p.y,isBoss));
+    this.playMusic();
+  }
+
+  checkWave() {
+    if (this.enemies.length===0) {
+      if (this.wave>=this.maxWaves) { this.state=STATE.WIN; }
+      else { this.pickups.push(new Pickup(this,400,240)); setTimeout(()=>this.spawnWave(),2000); }
+    }
+  }
+
+  loop(ts) {
+    const dt=Math.min(ts-this.lastTime,33);
+    this.lastTime=ts; this.frameCount++;
+    this.update(dt); this.render();
+    requestAnimationFrame(t=>this.loop(t));
+  }
+
+  update(dt) {
+    if (this.state!==STATE.PLAYING) {
+      // Consuma Enter anche negli altri stati
+      if (this.input.wasPressed('Enter')) this.start();
+      return;
+    }
+    this.player.update(dt);
+    this.enemies.forEach(e=>e.update(dt));
+    this.enemies=this.enemies.filter(e=>!e.removed);
+    this.pickups.forEach(p=>p.update(this.player));
+    this.pickups=this.pickups.filter(p=>!p.collected);
+    this.particles=this.particles.filter(p=>{p.update();return p.life>0;});
+    this.checkWave();
+  }
+
+  render() {
+    const ctx=this.ctx;
+    ctx.clearRect(0,0,800,450);
+
+    if (this.state===STATE.START)    { this.drawStart(); return; }
+    if (this.state===STATE.GAMEOVER) { this.drawGameOver(); return; }
+    if (this.state===STATE.WIN)      { this.drawWin(); return; }
+
+    if (this.imgs.bg) ctx.drawImage(this.imgs.bg,0,0,800,450);
+
+    // Guide di profondità
+    ctx.strokeStyle='rgba(255,200,100,0.1)';
+    ctx.lineWidth=1;
+    [CFG.ground.yMin,CFG.ground.yMax].forEach(y=>{ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(800,y); ctx.stroke(); });
+
+    // Z-sort
+    [...this.enemies,this.player].sort((a,b)=>a.y-b.y).forEach(e=>e.render(ctx));
+
+    this.pickups.forEach(p=>p.render(ctx));
+    this.particles.forEach(p=>p.render(ctx));
+    this.drawHUD(ctx);
+  }
+
+  drawHUD(ctx) {
+    // HP bar
+    const bx=10,by=10,bw=200,bh=16;
+    if (this.imgs.hpbar) ctx.drawImage(this.imgs.hpbar,bx-4,by-4,bw+8,bh+8);
+    const r=this.player.hp/CFG.player.hp;
+    ctx.fillStyle=r>0.5?'#3dff4f':r>0.25?'#ffcc00':'#ff3333';
+    ctx.fillRect(bx+2,by+2,(bw-4)*r,bh-4);
+    ctx.strokeStyle='#555'; ctx.lineWidth=1; ctx.strokeRect(bx+2,by+2,bw-4,bh-4);
+    if (this.imgs.heart) ctx.drawImage(this.imgs.heart,bx-22,by-4,28,24);
+    ctx.fillStyle='#fff'; ctx.font='bold 10px monospace';
+    ctx.fillText(`HP ${this.player.hp}/${CFG.player.hp}`,bx+4,by+bh-3);
+
+    // SP bar
+    const sx=10,sy=by+bh+8,sw=200,sh=10;
+    if (this.imgs.hpbar) ctx.drawImage(this.imgs.hpbar,sx-4,sy-4,sw+8,sh+8);
+    ctx.fillStyle='#00bfff';
+    ctx.fillRect(sx+2,sy+2,(sw-4)*(this.player.special/100),sh-4);
+    ctx.strokeStyle='#555'; ctx.lineWidth=1; ctx.strokeRect(sx+2,sy+2,sw-4,sh-4);
+    ctx.fillStyle='#fff'; ctx.font='9px monospace'; ctx.fillText('SP',sx+4,sy+sh-2);
+
+    // Score + wave
+    ctx.fillStyle='#fff'; ctx.font='bold 14px monospace'; ctx.textAlign='right';
+    ctx.fillText(`SCORE: ${this.score}`,790,24);
+    ctx.fillText(`WAVE: ${this.wave}/${this.maxWaves}`,790,42);
+    ctx.textAlign='left';
+
+    // Boss bar
+    const boss=this.enemies.find(e=>e.isBoss);
+    if (boss) {
+      const bbw=300,bbh=20,bbx=250,bby=420;
+      ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(bbx-5,bby-5,bbw+10,bbh+10);
+      ctx.fillStyle='#cc0000'; ctx.fillRect(bbx,bby,bbw*(boss.hp/CFG.boss.hp),bbh);
+      ctx.strokeStyle='#ff4444'; ctx.lineWidth=2; ctx.strokeRect(bbx,bby,bbw,bbh);
+      ctx.fillStyle='#fff'; ctx.font='bold 12px monospace'; ctx.textAlign='center';
+      ctx.fillText('★ BOSS ★',400,bby-6); ctx.textAlign='left';
+    }
+
+    // Combo
+    if (this.player.comboCount>=2) {
+      ctx.fillStyle='#ffcc00';
+      ctx.font=`bold ${12+this.player.comboCount*2}px monospace`;
+      ctx.textAlign='center';
+      ctx.fillText(`COMBO x${this.player.comboCount}!`,400,160);
+      ctx.textAlign='left';
+    }
+
+    // Indicatore salto
+    if (this.player.jumping) {
+      ctx.fillStyle='rgba(255,255,255,0.5)';
+      ctx.font='10px monospace'; ctx.textAlign='center';
+      ctx.fillText('↑',this.player.x, this.player.y - 55);
+      ctx.textAlign='left';
+    }
+  }
+
+  spawnParticle(x,y,color,n=6) { for(let i=0;i<n;i++) this.particles.push(new Particle(x,y,color)); }
+
+  _drawBg(alpha=0.65) {
+    const ctx=this.ctx;
+    if (this.imgs.bg) ctx.drawImage(this.imgs.bg,0,0,800,450);
+    ctx.fillStyle=`rgba(0,0,0,${alpha})`; ctx.fillRect(0,0,800,450);
+  }
+
+  drawStart() {
+    this._drawBg();
+    const ctx=this.ctx; ctx.textAlign='center';
+    ctx.fillStyle='#ff4444'; ctx.font='bold 48px monospace'; ctx.fillText("STREETS OF RAGE",400,155);
+    ctx.fillStyle='#ffcc00'; ctx.font='bold 20px monospace'; ctx.fillText("Beat 'Em Up – Anni '80",400,195);
+    ctx.fillStyle='#ccc'; ctx.font='14px monospace';
+    ctx.fillText('← → Muovi   ↑ ↓ Profondità   SPAZIO Salto',400,270);
+    ctx.fillText('A Attacco   L Speciale (costa HP)',400,292);
+    ctx.fillStyle='#aaffaa'; ctx.font='bold 18px monospace';
+    if (Math.floor(Date.now()/500)%2===0) ctx.fillText('Premi ENTER per iniziare',400,340);
+    ctx.textAlign='left';
+  }
+
+  drawGameOver() {
+    this._drawBg(0.7);
+    const ctx=this.ctx; ctx.textAlign='center';
+    ctx.fillStyle='#ff3333'; ctx.font='bold 52px monospace'; ctx.fillText('GAME OVER',400,190);
+    ctx.fillStyle='#fff'; ctx.font='18px monospace'; ctx.fillText(`Score: ${this.score}`,400,250);
+    ctx.fillStyle='#aaffaa'; ctx.font='16px monospace';
+    if (Math.floor(Date.now()/500)%2===0) ctx.fillText('Premi ENTER per riprovare',400,310);
+    ctx.textAlign='left';
+  }
+
+  drawWin() {
+    this._drawBg(0.7);
+    const ctx=this.ctx; ctx.textAlign='center';
+    ctx.fillStyle='#ffcc00'; ctx.font='bold 42px monospace'; ctx.fillText('HAI VINTO!',400,180);
+    ctx.fillStyle='#fff'; ctx.font='18px monospace'; ctx.fillText(`Score finale: ${this.score}`,400,240);
+    ctx.fillStyle='#aaffaa'; ctx.font='16px monospace';
+    if (Math.floor(Date.now()/500)%2===0) ctx.fillText('Premi ENTER per rigiocare',400,300);
+    ctx.textAlign='left';
+  }
+}
+
+// ── AVVIO ──────────────────────────────────────
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+ctx.imageSmoothingEnabled=false;
+
+const game=new Game(canvas,ctx);
+game.loadAssets().then(()=>{
+  // DEBUG TEMPORANEO
+  console.log("Assets caricati:", Object.keys(game.imgs));
+  console.log("bg presente?", !!game.imgs.bg);
+  console.log("alienIdle presente?", !!game.imgs.alienIdle);
+  console.log("idle presente?", !!game.imgs.idle);
+  console.log("walk presente?", !!game.imgs.walk);
+  console.log("Suoni caricati:", Object.keys(game.snds));  // ← aggiungi questa riga
+
+  
+  requestAnimationFrame(ts=>{ game.lastTime=ts; game.loop(ts); });
+});
+
+// LIVELLO 2
+
+</script>
+</body>
+</html>
+
