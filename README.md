@@ -38,7 +38,7 @@ Animazioni previste:
 ## Nemici Alieni
 Animazioni previste:
 - Idle / Walk
-- Attacco melee con estensione innaturale degli arti
+- Attacco
 - Hit reaction
 - Death / ragdoll animation
 
@@ -49,7 +49,6 @@ Animazioni previste:
 Effetti realizzati come sprite separati in overlay:
 - Shockwave da impatto
 - Smear frame per enfatizzare velocità degli attacchi
-- Effetti energia
 - Polvere e impatti a terra
 
 Questa scelta permette:
@@ -100,5 +99,3 @@ Workflow utilizzato:
 - Struttura sprite ottimizzata per animazioni frame-by-frame
 - Effetti separati dal personaggio per evitare overlap tra frame
 - Organizzazione asset pensata per futura estensione del progetto
-3. **Laboratorio alieno**  
-   Luogo in cui vengono prodotti gli alieni, con ambientazione tecnologica e futuristica, in contrasto rispetto ai livelli precedenti.
