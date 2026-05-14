@@ -104,7 +104,6 @@ I nemici inseguono sempre il giocatore cercando di posizionarsi al suo fianco (a
 3. Viene controllata la collisione con i nemici davanti a te
 4. Se un nemico è nel range, subisce danno
 
-
 ### Range dell'Attacco
 ```
         Facing RIGHT →
